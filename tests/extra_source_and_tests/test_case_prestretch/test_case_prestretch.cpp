@@ -38,6 +38,41 @@ class TestBody : public ComplexShape
     }
 };
 
+// the width of constraint: 4 * resolution
+std::vector<Vecd> createLeftConstraint()
+{
+    std::vector<Vecd> left_constraint_shape;
+    left_constraint_shape.push_back(Vecd(0.0, 0.0));
+    left_constraint_shape.push_back(Vecd(0.0, DH));
+    left_constraint_shape.push_back(Vecd(resolution_ref * 4.0, DH));
+    left_constraint_shape.push_back(Vecd(resolution_ref * 4.0, 0.0));
+    left_constraint_shape.push_back(Vecd(0.0, 0.0));
+
+    return left_constraint_shape;
+}
+
+std::vector<Vecd> createRightConstraint()
+{
+    std::vector<Vecd> right_constraint_shape;
+    right_constraint_shape.push_back(Vecd(DL - resolution_ref * 4.0, 0.0));
+    right_constraint_shape.push_back(Vecd(DL - resolution_ref * 4.0, DH));
+    right_constraint_shape.push_back(Vecd(DL, DH));
+    right_constraint_shape.push_back(Vecd(DL, 0.0));
+    right_constraint_shape.push_back(Vecd(DL - resolution_ref * 4.0, 0.0));
+
+    return right_constraint_shape;
+}
+
+MultiPolygon conbimedConstraint()
+{
+    MultiPolygon multi_polygon;
+    multi_polygon.addAPolygon(createLeftConstraint(), ShapeBooleanOps::add);
+    multi_polygon.addAPolygon(createRightConstraint(), ShapeBooleanOps::add);
+
+    return multi_polygon;
+}
+
+
 // The following are classes with different constitutions: Linear, Saint Venat-Kirchhoff, Neo-Hookean constitutive model
  class LinearElasticSolidWithPrestretch : public LinearElasticSolid
 {
@@ -189,6 +224,10 @@ class TestBody : public ComplexShape
     Dynamics1Level<solid_dynamics::Integration1stHalfPK2> stress_relaxation_first_half(test_body_inner);
     Dynamics1Level<solid_dynamics::Integration2ndHalf> stress_relaxation_second_half(test_body_inner);
 
+    /** Constrain the Boundary. */
+    BodyRegionByParticle fixed_test_body(test_body, makeShared<MultiPolygonShape>(conbimedConstraint()));
+    SimpleDynamics<FixBodyPartConstraint> constraint_base(fixed_test_body);
+
     ReduceDynamics<solid_dynamics::AcousticTimeStep> computing_time_step_size(test_body);
     //-----------------------------------------------------------------------------
     // outputs
@@ -203,6 +242,7 @@ class TestBody : public ComplexShape
     sph_system.initializeSystemCellLinkedLists();
     sph_system.initializeSystemConfigurations();
     test_body_inner_corrected_configuration.exec();
+    constant_gravity.exec();
 
     Real &physical_time = *sph_system.getSystemVariableDataByName<Real>("PhysicalTime");
     int ite = 0;
@@ -230,6 +270,7 @@ class TestBody : public ComplexShape
             while (relaxation_time < Dt)
             {
                 stress_relaxation_first_half.exec(dt);
+                constraint_base.exec();
                 stress_relaxation_second_half.exec(dt);
 
                 ite++;
