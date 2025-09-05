@@ -7,14 +7,14 @@
 #include "sphinxsys.h"
 using namespace SPH;
 
-Real DH = 0.1;
+Real DH = 0.02;
 Real DL = 0.5;
-Real resolution_ref = DH / 20.0;
+Real resolution_ref = DH / 4.0;
 
 Real rho0_s = 1060.0;
 Real Youngs_modulus = 1.0e6;
-Real poisson = 0.499;
-Real gravity_g = 1.0;
+Real poisson = 0.45;
+Real gravity_g = 10.0;
 
 std::vector<Vecd> createBodyShape()
 {
@@ -72,125 +72,123 @@ MultiPolygon conbimedConstraint()
     return multi_polygon;
 }
 
-
 // The following are classes with different constitutions: Linear, Saint Venat-Kirchhoff, Neo-Hookean constitutive model
- class LinearElasticSolidWithPrestretch : public LinearElasticSolid
+class LinearElasticSolidWithPrestretch : public LinearElasticSolid
 {
-   public:
-     explicit LinearElasticSolidWithPrestretch(Real rho0, Real youngs_modulus, Real poisson_ratio)
-         : LinearElasticSolid(rho0, youngs_modulus, poisson_ratio)
-     {
-         material_type_name_ = "LinearElasticSolidWithPrestretch";
-         F_pre_inv_(0, 0) = 1.0 / 1.4;
-         F_pre_inv_(0, 1) = 0.0;
-         F_pre_inv_(1, 0) = 0.0;
-         F_pre_inv_(1, 1) = 1.4;
-     };
-     virtual ~LinearElasticSolidWithPrestretch() {};
+  public:
+    explicit LinearElasticSolidWithPrestretch(Real rho0, Real youngs_modulus, Real poisson_ratio)
+        : LinearElasticSolid(rho0, youngs_modulus, poisson_ratio)
+    {
+        material_type_name_ = "LinearElasticSolidWithPrestretch";
+        F_pre_inv_(0, 0) = 1.0 / 1.4;
+        F_pre_inv_(0, 1) = 0.0;
+        F_pre_inv_(1, 0) = 0.0;
+        F_pre_inv_(1, 1) = 1.4;
+    };
+    virtual ~LinearElasticSolidWithPrestretch() {};
 
-     virtual Matd StressPK2(Matd &F, size_t index_i) override
-     {
-         Matd F_e = F * F_pre_inv_;
-         Matd strain = 0.5 * (F_e.transpose() + F_e) - Matd::Identity();
-         return lambda0_ * strain.trace() * Matd::Identity() + 2.0 * G0_ * strain;
-     }
+    virtual Matd StressPK2(Matd &F, size_t index_i) override
+    {
+        Matd F_e = F * F_pre_inv_;
+        Matd strain = 0.5 * (F_e.transpose() + F_e) - Matd::Identity();
+        return lambda0_ * strain.trace() * Matd::Identity() + 2.0 * G0_ * strain;
+    }
 
-     virtual Matd StressPK1(Matd &F, size_t index_i) override
-     {
-         Matd F_e = F * F_pre_inv_;
-         return F_e * StressPK2(F, index_i);
-     }
+    virtual Matd StressPK1(Matd &F, size_t index_i) override
+    {
+        Matd F_e = F * F_pre_inv_;
+        return F_e * StressPK2(F, index_i);
+    }
 
-     virtual Real VolumetricKirchhoff(Real J) override
-     {
-         Real J_e = J * F_pre_inv_.determinant();
-         return K0_ * J_e * (J_e - 1);
-     }
+    virtual Real VolumetricKirchhoff(Real J) override
+    {
+        Real J_e = J * F_pre_inv_.determinant();
+        return K0_ * J_e * (J_e - 1);
+    }
 
-   private:
-     Matd F_pre_inv_;
+  private:
+    Matd F_pre_inv_;
+};
 
- };
+// class PrestressedSolid : public SaintVenantKirchhoffSolid
+//{
+//   public:
+//     explicit PrestressedSolid(Real rho0, Real youngs_modulus, Real poisson_ratio)
+//         : SaintVenantKirchhoffSolid(rho0, youngs_modulus, poisson_ratio)
+//     {
+//         material_type_name_ = "PrestressedSolid";
+//         F_p_inv(0, 0) = 1.0 / 1.2;
+//         F_p_inv(0, 1) = 0.0;
+//         F_p_inv(1, 0) = 0.0;
+//         F_p_inv(1, 1) = 1.2;
+//     };
+//     virtual ~PrestressedSolid() {};
+//
+//     /** second Piola-Kirchhoff stress related with green-lagrangian deformation tensor */
+//     virtual Matd StressPK2(Matd &F, size_t index_i) override
+//     {
+//         // Fe = F * Fp'
+//         //Matd F_e = F * F_p_inv;
+//         //Matd strain = 0.5 * (F_e.transpose() * F_e - Matd::Identity());
+//         //return lambda0_ * strain.trace() * Matd::Identity() + 2.0 * G0_ * strain;
+//
+//         Matd strain = 0.5 * (F.transpose() * F - Matd::Identity());
+//         Matd pre_strain = 0.5 * (F_p_inv.transpose() * F_p_inv - Matd::Identity());
+//         pre_strain -= pre_strain.trace() / Dimensions * Matd::Identity(); //ï¿½ï¿½È¥ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú²ï¿½ï¿½É±ï¿½0.499ï¿½ï¿½lambda0_Öµï¿½ï¿½ï¿½ï¿½
+//         return lambda0_ * strain.trace() * Matd::Identity() + 2.0 * G0_ * strain + 2.0 * G0_ * pre_strain; // ï¿½ï¿½ï¿½Ô²ï¿½ï¿½É±ï¿½0.45ï¿½Ò²ï¿½ï¿½ï¿½È¥ï¿½ï¿½ï¿½ï¿½ï¿½--ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½
+//     };
+//
+//   private:
+//     Matd F_p_inv;
+// };
 
- // class PrestressedSolid : public SaintVenantKirchhoffSolid
- //{
- //   public:
- //     explicit PrestressedSolid(Real rho0, Real youngs_modulus, Real poisson_ratio)
- //         : SaintVenantKirchhoffSolid(rho0, youngs_modulus, poisson_ratio)
- //     {
- //         material_type_name_ = "PrestressedSolid";
- //         F_p_inv(0, 0) = 1.0 / 1.2;
- //         F_p_inv(0, 1) = 0.0;
- //         F_p_inv(1, 0) = 0.0;
- //         F_p_inv(1, 1) = 1.2;
- //     };
- //     virtual ~PrestressedSolid() {};
- //
- //     /** second Piola-Kirchhoff stress related with green-lagrangian deformation tensor */
- //     virtual Matd StressPK2(Matd &F, size_t index_i) override
- //     {
- //         // Fe = F * Fp'
- //         //Matd F_e = F * F_p_inv;
- //         //Matd strain = 0.5 * (F_e.transpose() * F_e - Matd::Identity());
- //         //return lambda0_ * strain.trace() * Matd::Identity() + 2.0 * G0_ * strain;
- //
- //         Matd strain = 0.5 * (F.transpose() * F - Matd::Identity());
- //         Matd pre_strain = 0.5 * (F_p_inv.transpose() * F_p_inv - Matd::Identity());
- //         pre_strain -= pre_strain.trace() / Dimensions * Matd::Identity(); //¼õÈ¥Ìå»ýÏî ·ñÔò¶ÔÓÚ²´ËÉ±È0.499£¬lambda0_Öµ¸ü´ó
- //         return lambda0_ * strain.trace() * Matd::Identity() + 2.0 * G0_ * strain + 2.0 * G0_ * pre_strain; // ÊÔÊÔ²´ËÉ±È0.45ÇÒ²»¼õÈ¥Ìå»ýÏî--½á¹û¼¸ºõ¿´²»¼û±ÚÃæÁ£×ÓÒÆ¶¯
- //     };
- //
- //   private:
- //     Matd F_p_inv;
- // };
+// class PrestressedSolidBasedOnNeoHookean : public NeoHookeanSolid
+//{
+//   public:
+//     explicit PrestressedSolidBasedOnNeoHookean(Real rho0, Real youngs_modulus, Real poisson_ratio)
+//         : NeoHookeanSolid(rho0, youngs_modulus, poisson_ratio)
+//     {
+//         material_type_name_ = "PrestressedSolidBasedOnNeoHookean";
+//         F_p_inv(0, 0) = 1.0 / 1.2;
+//         F_p_inv(0, 1) = 0.0;
+//         F_p_inv(1, 0) = 0.0;
+//         F_p_inv(1, 1) = 1.2;
+//     };
+//     virtual ~PrestressedSolidBasedOnNeoHookean() {};
+//
+//     /** second Piola-Kirchhoff stress related with green-lagrangian deformation tensor */
+//     virtual Matd StressPK2(Matd &F, size_t index_i) override
+//     {
+//         Matd Fe = F * F_p_inv;
+//         Matd right_cauchy = Fe.transpose() * Fe;
+//         Real J = F.determinant();
+//         return G0_ * Matd::Identity() + (lambda0_ * (J - 1.0) - G0_) * J * right_cauchy.inverse();
+//     };
+//     virtual Matd StressCauchy(Matd &almansi_strain, size_t particle_index_i) override
+//     {
+//         Matd B = (-2.0 * almansi_strain + Matd::Identity()).inverse();
+//         Real J = sqrt(B.determinant());
+//         Matd cauchy_stress = 0.5 * K0_ * (J - 1.0 / J) * Matd::Identity() +
+//                              G0_ * pow(J, -2.0 * OneOverDimensions - 1.0) *
+//                                  (B - OneOverDimensions * B.trace() * Matd::Identity());
+//         return cauchy_stress;
+//     };
+//     /** Volumetric Kirchhoff stress from determinate */
+//     virtual Real VolumetricKirchhoff(Real J) override
+//     {
+//         return 0.5 * K0_ * (J * J - 1);
+//     };
+//     /** Define the calculation of the stress matrix for postprocessing */
+//     virtual std::string getRelevantStressMeasureName() override { return "Cauchy"; };
+//
+//   private:
+//     Matd F_p_inv;
+// };
 
- // class PrestressedSolidBasedOnNeoHookean : public NeoHookeanSolid
- //{
- //   public:
- //     explicit PrestressedSolidBasedOnNeoHookean(Real rho0, Real youngs_modulus, Real poisson_ratio)
- //         : NeoHookeanSolid(rho0, youngs_modulus, poisson_ratio)
- //     {
- //         material_type_name_ = "PrestressedSolidBasedOnNeoHookean";
- //         F_p_inv(0, 0) = 1.0 / 1.2;
- //         F_p_inv(0, 1) = 0.0;
- //         F_p_inv(1, 0) = 0.0;
- //         F_p_inv(1, 1) = 1.2;
- //     };
- //     virtual ~PrestressedSolidBasedOnNeoHookean() {};
- //
- //     /** second Piola-Kirchhoff stress related with green-lagrangian deformation tensor */
- //     virtual Matd StressPK2(Matd &F, size_t index_i) override
- //     {
- //         Matd Fe = F * F_p_inv;
- //         Matd right_cauchy = Fe.transpose() * Fe;
- //         Real J = F.determinant();
- //         return G0_ * Matd::Identity() + (lambda0_ * (J - 1.0) - G0_) * J * right_cauchy.inverse();
- //     };
- //     virtual Matd StressCauchy(Matd &almansi_strain, size_t particle_index_i) override
- //     {
- //         Matd B = (-2.0 * almansi_strain + Matd::Identity()).inverse();
- //         Real J = sqrt(B.determinant());
- //         Matd cauchy_stress = 0.5 * K0_ * (J - 1.0 / J) * Matd::Identity() +
- //                              G0_ * pow(J, -2.0 * OneOverDimensions - 1.0) *
- //                                  (B - OneOverDimensions * B.trace() * Matd::Identity());
- //         return cauchy_stress;
- //     };
- //     /** Volumetric Kirchhoff stress from determinate */
- //     virtual Real VolumetricKirchhoff(Real J) override
- //     {
- //         return 0.5 * K0_ * (J * J - 1);
- //     };
- //     /** Define the calculation of the stress matrix for postprocessing */
- //     virtual std::string getRelevantStressMeasureName() override { return "Cauchy"; };
- //
- //   private:
- //     Matd F_p_inv;
- // };
-
- //------------------------------------------------------------------------------
- // the main program
- //------------------------------------------------------------------------------
- int main(int ac, char *av[])
+//------------------------------------------------------------------------------
+// the main program
+//------------------------------------------------------------------------------
+int main(int ac, char *av[])
 {
     //----------------------------------------------------------------------
     //	Build up the environment of a SPHSystem
@@ -203,7 +201,7 @@ MultiPolygon conbimedConstraint()
     //	Creating body, materials and particles.
     //----------------------------------------------------------------------
     SolidBody test_body(sph_system, makeShared<TestBody>("WallBoundary"));
-    test_body.defineMaterial<SaintVenantKirchhoffSolid>(rho0_s, Youngs_modulus, poisson); 
+    test_body.defineMaterial<SaintVenantKirchhoffSolid>(rho0_s, Youngs_modulus, poisson);
     test_body.generateParticles<BaseParticles, Lattice>();
 
     //----------------------------------------------------------------------
@@ -289,6 +287,7 @@ MultiPolygon conbimedConstraint()
         }
 
         TickCount t2 = TickCount::now();
+        wall_stress.exec();
         write_real_body_states.writeToFile();
         TickCount t3 = TickCount::now();
         interval += t3 - t2;
