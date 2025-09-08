@@ -89,21 +89,18 @@ class LinearElasticSolidWithPrestretch : public LinearElasticSolid
 
     virtual Matd StressPK2(Matd &F, size_t index_i) override
     {
+        Matd F0 = F_pre_inv_.inverse();
         Matd F_e = F * F_pre_inv_;
-        Matd strain = 0.5 * (F_e.transpose() + F_e) - Matd::Identity();
-        return lambda0_ * strain.trace() * Matd::Identity() + 2.0 * G0_ * strain;
+        Matd F0_star = F0.determinant() * F_pre_inv_.transpose();
+
+        Matd E_e = 0.5 * (F.transpose() * F - Matd::Identity()) - 0.5 * (F0.transpose() * F0 - Matd::Identity());
+        return (lambda0_ * E_e.trace() * Matd::Identity() + 2.0 * G0_ * E_e) * F0_star;
     }
 
     virtual Matd StressPK1(Matd &F, size_t index_i) override
     {
         Matd F_e = F * F_pre_inv_;
         return F_e * StressPK2(F, index_i);
-    }
-
-    virtual Real VolumetricKirchhoff(Real J) override
-    {
-        Real J_e = J * F_pre_inv_.determinant();
-        return K0_ * J_e * (J_e - 1);
     }
 
   private:
@@ -201,7 +198,7 @@ int main(int ac, char *av[])
     //	Creating body, materials and particles.
     //----------------------------------------------------------------------
     SolidBody test_body(sph_system, makeShared<TestBody>("WallBoundary"));
-    test_body.defineMaterial<SaintVenantKirchhoffSolid>(rho0_s, Youngs_modulus, poisson);
+    test_body.defineMaterial<LinearElasticSolidWithPrestretch>(rho0_s, Youngs_modulus, poisson);
     test_body.generateParticles<BaseParticles, Lattice>();
 
     //----------------------------------------------------------------------
