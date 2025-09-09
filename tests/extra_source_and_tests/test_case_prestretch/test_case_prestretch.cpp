@@ -7,14 +7,14 @@
 #include "sphinxsys.h"
 using namespace SPH;
 
-Real DH = 0.02;
+Real DH = 0.01;
 Real DL = 0.5;
 Real resolution_ref = DH / 4.0;
 
 Real rho0_s = 1060.0;
 Real Youngs_modulus = 1.0e6;
 Real poisson = 0.45;
-Real gravity_g = 10.0;
+Real gravity_g = 0.0;
 
 std::vector<Vecd> createBodyShape()
 {
@@ -80,31 +80,28 @@ class LinearElasticSolidWithPrestretch : public LinearElasticSolid
         : LinearElasticSolid(rho0, youngs_modulus, poisson_ratio)
     {
         material_type_name_ = "LinearElasticSolidWithPrestretch";
-        F_pre_inv_(0, 0) = 1.0 / 1.4;
-        F_pre_inv_(0, 1) = 0.0;
-        F_pre_inv_(1, 0) = 0.0;
-        F_pre_inv_(1, 1) = 1.4;
+        F_pre_(0, 0) = 1.5;
+        F_pre_(0, 1) = 0.0;
+        F_pre_(1, 0) = 0.0;
+        F_pre_(1, 1) = 1.0 / 1.5;
     };
     virtual ~LinearElasticSolidWithPrestretch() {};
 
     virtual Matd StressPK2(Matd &F, size_t index_i) override
     {
-        Matd F0 = F_pre_inv_.inverse();
-        Matd F_e = F * F_pre_inv_;
-        Matd F0_star = F0.determinant() * F_pre_inv_.transpose();
-
-        Matd E_e = 0.5 * (F.transpose() * F - Matd::Identity()) - 0.5 * (F0.transpose() * F0 - Matd::Identity());
-        return (lambda0_ * E_e.trace() * Matd::Identity() + 2.0 * G0_ * E_e) * F0_star;
+        Matd strain = 0.5 * (F.transpose() + F) - Matd::Identity();
+        Matd strain_pre = 0.5 * (F_pre_.transpose() + F_pre_) - Matd::Identity();
+        return lambda0_ * strain.trace() * Matd::Identity() + 2.0 * G0_ * strain +
+               lambda0_ * strain_pre.trace() * Matd::Identity() + 2.0 * G0_ * strain_pre;
     }
 
     virtual Matd StressPK1(Matd &F, size_t index_i) override
     {
-        Matd F_e = F * F_pre_inv_;
-        return F_e * StressPK2(F, index_i);
+        return F * StressPK2(F, index_i);
     }
 
   private:
-    Matd F_pre_inv_;
+    Matd F_pre_;
 };
 
 // class PrestressedSolid : public SaintVenantKirchhoffSolid
@@ -131,8 +128,8 @@ class LinearElasticSolidWithPrestretch : public LinearElasticSolid
 //
 //         Matd strain = 0.5 * (F.transpose() * F - Matd::Identity());
 //         Matd pre_strain = 0.5 * (F_p_inv.transpose() * F_p_inv - Matd::Identity());
-//         pre_strain -= pre_strain.trace() / Dimensions * Matd::Identity(); //��ȥ����� ������ڲ��ɱ�0.499��lambda0_ֵ����
-//         return lambda0_ * strain.trace() * Matd::Identity() + 2.0 * G0_ * strain + 2.0 * G0_ * pre_strain; // ���Բ��ɱ�0.45�Ҳ���ȥ�����--����������������������ƶ�
+//         pre_strain -= pre_strain.trace() / Dimensions * Matd::Identity();
+//         return lambda0_ * strain.trace() * Matd::Identity() + 2.0 * G0_ * strain + 2.0 * G0_ * pre_strain;
 //     };
 //
 //   private:
