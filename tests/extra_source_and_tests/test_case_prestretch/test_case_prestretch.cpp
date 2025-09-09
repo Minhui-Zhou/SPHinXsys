@@ -89,14 +89,9 @@ class LinearElasticSolidWithPrestretch : public LinearElasticSolid
 
     virtual Matd StressPK2(Matd &F, size_t index_i) override
     {
-        Matd F_real = F + F_pre_;
-        Matd strain = 0.5 * (F_real.transpose() + F_real) - Matd::Identity();
+        Matd strain = 0.5 * (F.transpose() + F) - Matd::Identity() +
+                      0.5 * (F_pre_.transpose() + F_pre_) - Matd::Identity();
         return lambda0_ * strain.trace() * Matd::Identity() + 2.0 * G0_ * strain;
-
-        // Matd strain = 0.5 * (F.transpose() + F) - Matd::Identity();
-        // Matd strain_pre = 0.5 * (F_pre_.transpose() + F_pre_) - Matd::Identity();
-        // return lambda0_ * strain.trace() * Matd::Identity() + 2.0 * G0_ * strain +
-        //        lambda0_ * strain_pre.trace() * Matd::Identity() + 2.0 * G0_ * strain_pre;
     }
 
   private:
