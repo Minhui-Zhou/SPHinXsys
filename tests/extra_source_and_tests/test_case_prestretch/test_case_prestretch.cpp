@@ -14,7 +14,7 @@ Real resolution_ref = DH / 4.0;
 Real rho0_s = 1060.0;
 Real Youngs_modulus = 1.0e6;
 Real poisson = 0.45;
-Real gravity_g = 0.0;
+Real gravity_g = 100.0;
 
 std::vector<Vecd> createBodyShape()
 {
@@ -93,11 +93,6 @@ class LinearElasticSolidWithPrestretch : public LinearElasticSolid
         Matd strain_pre = 0.5 * (F_pre_.transpose() + F_pre_) - Matd::Identity();
         return lambda0_ * strain.trace() * Matd::Identity() + 2.0 * G0_ * strain +
                lambda0_ * strain_pre.trace() * Matd::Identity() + 2.0 * G0_ * strain_pre;
-    }
-
-    virtual Matd StressPK1(Matd &F, size_t index_i) override
-    {
-        return F * StressPK2(F, index_i);
     }
 
   private:
