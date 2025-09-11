@@ -46,57 +46,6 @@ class Ring : public MultiPolygonShape
     }
 };
 
-class Ring_s : public MultiPolygonShape
-{
-  public:
-    explicit Ring_s(const std::string &shape_name, const Vec2d &center, Real radius_inner, Real radius_outer) : MultiPolygonShape(shape_name)
-    {
-        multi_polygon_.addACircle(center, radius_outer, 100, ShapeBooleanOps::add);
-        multi_polygon_.addACircle(center, radius_inner, 100, ShapeBooleanOps::sub);
-    }
-};
-class Ring_m : public MultiPolygonShape
-{
-  public:
-    explicit Ring_m(const std::string &shape_name, const Vec2d &center, Real radius_inner, Real radius_outer) : MultiPolygonShape(shape_name)
-    {
-        multi_polygon_.addACircle(center, radius_outer, 100, ShapeBooleanOps::add);
-        multi_polygon_.addACircle(center, radius_inner, 100, ShapeBooleanOps::sub);
-    }
-};
-
-namespace SPH
-{
-class BodyRing;
-template <>
-class ParticleGenerator<BaseParticles, BodyRing> : public ParticleGenerator<BaseParticles>
-{
-    const Vec2d center_;
-    const Real mid_srf_radius_;
-    const Real dp_;
-    const Real thickness_;
-
-  public:
-    ParticleGenerator(SPHBody &sph_body, BaseParticles &surface_particles, const Vec2d &center, Real mid_srf_radius, Real dp, Real thickness)
-        : ParticleGenerator<BaseParticles>(sph_body, surface_particles),
-          center_(center),
-          mid_srf_radius_(mid_srf_radius),
-          dp_(dp),
-          thickness_(thickness) {};
-    void prepareGeometricData() override
-    {
-        const auto number_of_particles = int(2 * Pi * mid_srf_radius_ / dp_);
-        const Real dtheta = 2 * Pi / Real(number_of_particles);
-        for (int n = 0; n < number_of_particles; n++)
-        {
-            const Vec2d center_to_pos = mid_srf_radius_ * Vec2d(cos(n * dtheta), sin(n * dtheta));
-            addPositionAndVolumetricMeasure(center_ + center_to_pos, dp_);
-            // addSurfaceProperties(center_to_pos.normalized(), thickness_);
-        }
-    }
-};
-} // namespace SPH
-
 class InitialVelocityCondition : public BaseLocalDynamics<SPHBody>
 {
   private:
@@ -112,29 +61,6 @@ class InitialVelocityCondition : public BaseLocalDynamics<SPHBody>
     {
         vel_[index_i] = initial_velocity_;
     }
-};
-
-class BoundaryGeometry : public BodyPartByParticle
-{
-  private:
-    Real diameter_;
-    Real dp_;
-    Vec2d center_;
-
-  public:
-    BoundaryGeometry(SPHBody &body, Real diameter, Real dp, const Vec2d &center)
-        : BodyPartByParticle(body), diameter_(diameter), dp_(dp), center_(center)
-    {
-        TaggingParticleMethod tagging_particle_method = std::bind(&BoundaryGeometry::tagManually, this, _1);
-        tagParticles(tagging_particle_method);
-    };
-
-  private:
-    bool tagManually(size_t index_i)
-    {
-        Real radius = (pos_[index_i] - center_).norm();
-        return radius > 0.5 * diameter_ - 0.7 * dp_;
-    };
 };
 
 Real get_physical_viscosity_general(Real rho, Real youngs_modulus, Real length_scale, Real shape_constant = 0.4)
@@ -180,12 +106,12 @@ void three_ring_impact(int resolution_factor_l, int resolution_factor_m, int res
 
     // material
     const Real rho_l = 1.0;
-    const Real rho_m = 0.01; // 实际也是用在m上
-    const Real rho_s = 0.1;  // 实际也用在s上
+    const Real rho_m = 0.01;
+    const Real rho_s = 0.1;
 
-    const Real youngs_modulus_l = 288e3;
-    const Real youngs_modulus_m = 10e3; // 实际用在了s上
-    const Real youngs_modulus_s = 2250; // 实际上用在了m上
+    const Real youngs_modulus_l = 288.0e3;
+    const Real youngs_modulus_m = 2250.0;
+    const Real youngs_modulus_s = 1.0e4;
 
     const Real possion_ratio = 0.125; // poisson
 
@@ -212,14 +138,14 @@ void three_ring_impact(int resolution_factor_l, int resolution_factor_m, int res
     ring_l_body.generateParticles<BaseParticles, Lattice>();
     auto particles_l = &ring_l_body.getBaseParticles();
 
-    SolidBody ring_m_body(system, makeShared<Ring_m>("RingMedium", center_m, 0.5 * diameter_inner_m, 0.5 * diameter_outer_m));
+    SolidBody ring_m_body(system, makeShared<Ring>("RingMedium", center_m, 0.5 * diameter_inner_m, 0.5 * diameter_outer_m));
     ring_m_body.defineBodyLevelSetShape();
     ring_m_body.defineAdaptationRatios(1.15, dp_l / dp_m);
     ring_m_body.defineMaterial<NeoHookeanSolid>(*material_m.get());
     ring_m_body.generateParticles<BaseParticles, Lattice>();
     auto particles_m = &ring_m_body.getBaseParticles();
 
-    SolidBody ring_s_body(system, makeShared<Ring_s>("RingSmall", center_s, 0.5 * diameter_inner_s, 0.5 * diameter_outer_s));
+    SolidBody ring_s_body(system, makeShared<Ring>("RingSmall", center_s, 0.5 * diameter_inner_s, 0.5 * diameter_outer_s));
     ring_s_body.defineBodyLevelSetShape();
     ring_s_body.defineAdaptationRatios(1.15, dp_l / dp_s);
     ring_s_body.defineMaterial<NeoHookeanSolid>(rho_s, youngs_modulus_s, possion_ratio);
@@ -241,32 +167,30 @@ void three_ring_impact(int resolution_factor_l, int resolution_factor_m, int res
     relax_solid(ring_s_body, ring_s_inner);
 
     // Methods
-    InteractionWithUpdate<LinearGradientCorrectionMatrixInner> corrected_configuration_l(ring_l_inner);
-    Dynamics1Level<solid_dynamics::Integration1stHalfPK2> stress_relaxation_first_half_l(ring_l_inner);
-    Dynamics1Level<solid_dynamics::Integration2ndHalf> stress_relaxation_second_half_l(ring_l_inner);
+    // InteractionWithUpdate<LinearGradientCorrectionMatrixInner> corrected_configuration_l(ring_l_inner);
+    // Dynamics1Level<solid_dynamics::Integration1stHalfPK2> stress_relaxation_first_half_l(ring_l_inner);
+    // Dynamics1Level<solid_dynamics::Integration2ndHalf> stress_relaxation_second_half_l(ring_l_inner);
     // DampingWithRandomChoice<InteractionSplit<DampingPairwiseInner<Vec2d, FixedDampingRate>>>
     //     velocity_damping_l(0.2, ring_l_inner, "Velocity", physical_viscosity_l);
     // SimpleDynamics<NormalDirectionFromBodyShape> update_normal_l(ring_l_body);
-    ReduceDynamics<solid_dynamics::AcousticTimeStep> computing_time_step_size_l(ring_l_body);
+    // ReduceDynamics<solid_dynamics::AcousticTimeStep> computing_time_step_size_l(ring_l_body);
 
     InteractionWithUpdate<LinearGradientCorrectionMatrixInner> corrected_configuration_m(ring_m_inner);
-    Dynamics1Level<solid_dynamics::Integration1stHalfPK2> stress_relaxation_first_half_m(ring_m_inner);
+    Dynamics1Level<solid_dynamics::DecomposedIntegration1stHalf> stress_relaxation_first_half_m(ring_m_inner);
     Dynamics1Level<solid_dynamics::Integration2ndHalf> stress_relaxation_second_half_m(ring_m_inner);
     // DampingWithRandomChoice<InteractionSplit<DampingPairwiseInner<Vec2d, FixedDampingRate>>>
     //     velocity_damping_m(0.2, ring_m_inner, "Velocity", physical_viscosity_m);
     // DampingWithRandomChoice<InteractionSplit<DampingPairwiseInner<Vec2d, FixedDampingRate>>>
     //     rotation_damping_m(0.2, ring_m_inner, "AngularVelocity", physical_viscosity_m);
-    SimpleDynamics<NormalDirectionFromBodyShape> update_normal_m(ring_m_body);
     ReduceDynamics<solid_dynamics::AcousticTimeStep> computing_time_step_size_m(ring_m_body);
 
     InteractionWithUpdate<LinearGradientCorrectionMatrixInner> corrected_configuration_s(ring_s_inner);
-    Dynamics1Level<solid_dynamics::Integration1stHalfPK2> stress_relaxation_first_half_s(ring_s_inner);
+    Dynamics1Level<solid_dynamics::DecomposedIntegration1stHalf> stress_relaxation_first_half_s(ring_s_inner);
     Dynamics1Level<solid_dynamics::Integration2ndHalf> stress_relaxation_second_half_s(ring_s_inner);
     // DampingWithRandomChoice<InteractionSplit<DampingPairwiseInner<Vec2d, FixedDampingRate>>>
     //     velocity_damping_s(0.2, ring_s_inner, "Velocity", physical_viscosity_s);
     // DampingWithRandomChoice<InteractionSplit<DampingPairwiseInner<Vec2d, FixedDampingRate>>>
     //     rotation_damping_s(0.2, ring_s_inner, "AngularVelocity", physical_viscosity_s);
-    SimpleDynamics<NormalDirectionFromBodyShape> update_normal_s(ring_s_body);
     ReduceDynamics<solid_dynamics::AcousticTimeStep> computing_time_step_size_s(ring_s_body);
 
     // self contact
@@ -274,14 +198,15 @@ void three_ring_impact(int resolution_factor_l, int resolution_factor_m, int res
     SelfSurfaceContactRelation self_contact_s(ring_s_body);
 
     InteractionDynamics<solid_dynamics::ContactFactorSummation> update_contact_density_s(contact_s);
-    InteractionWithUpdate<solid_dynamics::ContactForceFromWall> compute_solid_contact_forces_s(contact_s);
     InteractionDynamics<solid_dynamics::ContactFactorSummation> update_contact_density_m(contact_m);
-    InteractionWithUpdate<solid_dynamics::ContactForceFromWall> compute_solid_contact_forces_m(contact_m);
     InteractionDynamics<solid_dynamics::ContactFactorSummation> update_contact_density_l(contact_l);
-    InteractionWithUpdate<solid_dynamics::ContactForceFromWall> compute_solid_contact_forces_l(contact_l);
+
+    InteractionWithUpdate<solid_dynamics::ContactForce> compute_solid_contact_forces_s(contact_s);
+    InteractionWithUpdate<solid_dynamics::ContactForce> compute_solid_contact_forces_m(contact_m);
+    // InteractionWithUpdate<solid_dynamics::ContactForceFromWall> compute_solid_contact_forces_l(contact_l);
     SimpleDynamics<VonMisesStress> calculate_stress_s(ring_s_body);
     SimpleDynamics<VonMisesStress> calculate_stress_m(ring_m_body);
-    SimpleDynamics<VonMisesStress> calculate_stress_l(ring_l_body);
+    // SimpleDynamics<VonMisesStress> calculate_stress_l(ring_l_body);
 
     // InteractionWithUpdate<solid_dynamics::ContactForce> contact_forces_m(contact_m);
     // InteractionWithUpdate<solid_dynamics::ContactForce> contact_forces_s(contact_s);
@@ -318,10 +243,6 @@ void three_ring_impact(int resolution_factor_l, int resolution_factor_m, int res
     // Inital condition
     SimpleDynamics<InitialVelocityCondition> vel_ic_s(ring_s_body, Vec2d(-30, 30));
 
-    // Boundary condition
-    BoundaryGeometry fixed_part_l(ring_l_body, diameter_outer_l, dp_l, center_l);
-    SimpleDynamics<FixBodyPartConstraint> fix_bc_l(fixed_part_l);
-
     // Observer
     const Vec2d observer_pos = center_m + 0.5 * mid_srf_diameter_m * (center_m - center_s).normalized();
     StdVec<Vec2d> observation_location{observer_pos};
@@ -348,16 +269,12 @@ void three_ring_impact(int resolution_factor_l, int resolution_factor_m, int res
     // Initialization
     system.initializeSystemCellLinkedLists();
     system.initializeSystemConfigurations();
-    // update_normal_s.exec();
-    // update_normal_m.exec();
 
-    corrected_configuration_l.exec();
     corrected_configuration_m.exec();
     corrected_configuration_s.exec();
 
     contact_s.updateConfiguration();
     contact_m.updateConfiguration();
-    // contact_l.updateConfiguration();
 
     vel_ic_s.exec();
 
@@ -368,7 +285,7 @@ void three_ring_impact(int resolution_factor_l, int resolution_factor_m, int res
     Real output_period = end_time / 500.0;
     Real dt = 0.0;
     TickCount t1 = TickCount::now();
-    const Real dt_ref = std::min({computing_time_step_size_l.exec(), computing_time_step_size_m.exec(), computing_time_step_size_s.exec()});
+    const Real dt_ref = std::min({computing_time_step_size_m.exec(), computing_time_step_size_s.exec()});
     auto run_simulation = [&]()
     {
         while (physical_time < end_time)
@@ -385,46 +302,34 @@ void three_ring_impact(int resolution_factor_l, int resolution_factor_m, int res
 
                 update_contact_density_s.exec(); // 试了像collision一样的sml分别分开density和force的update加compute加stree松弛的顺序，结果没区别
                 update_contact_density_m.exec();
-                update_contact_density_l.exec();
 
                 compute_solid_contact_forces_s.exec();
                 compute_solid_contact_forces_m.exec();
-                compute_solid_contact_forces_l.exec();
 
                 self_contact_density_m.exec();
                 self_contact_forces_m.exec();
-                // self_contact_density_s.exec();
-                // self_contact_forces_s.exec();
+                self_contact_density_s.exec();
+                self_contact_forces_s.exec();
 
-                dt = std::min({computing_time_step_size_l.exec(), computing_time_step_size_m.exec(), computing_time_step_size_s.exec()});
+                dt = std::min({computing_time_step_size_m.exec(), computing_time_step_size_s.exec()});
                 if (dt < dt_ref / 1e2)
                     throw std::runtime_error("time step decreased too much");
 
-                stress_relaxation_first_half_l.exec(dt);
                 stress_relaxation_first_half_m.exec(dt);
                 stress_relaxation_first_half_s.exec(dt);
-
-                fix_bc_l.exec();
 
                 // velocity_damping_l.exec(dt);
                 // velocity_damping_m.exec(dt);
                 // rotation_damping_m.exec(dt);
                 // rotation_damping_s.exec(dt);
                 // velocity_damping_s.exec(dt);
-
-                // fix_bc_l.exec();
-
-                stress_relaxation_second_half_l.exec(dt);
                 stress_relaxation_second_half_m.exec(dt);
                 stress_relaxation_second_half_s.exec(dt);
 
-                ring_l_body.updateCellLinkedList();
                 ring_m_body.updateCellLinkedList();
                 ring_s_body.updateCellLinkedList();
-                update_normal_m.exec();
-                update_normal_s.exec();
                 self_contact_m.updateConfiguration();
-                // self_contact_s.updateConfiguration();
+                self_contact_s.updateConfiguration();
                 contact_s.updateConfiguration();
                 contact_m.updateConfiguration();
                 contact_l.updateConfiguration();
@@ -432,16 +337,6 @@ void three_ring_impact(int resolution_factor_l, int resolution_factor_m, int res
                 ++ite;
                 integral_time += dt;
                 physical_time += dt;
-                // ring_l_body.updateCellLinkedList();放这里没区别
-                // ring_m_body.updateCellLinkedList();
-                // ring_s_body.updateCellLinkedList();
-                // update_normal_m.exec();
-                // update_normal_s.exec();
-                // self_contact_m.updateConfiguration();
-                // contact_s.updateConfiguration();
-                // contact_m.updateConfiguration();
-                // contact_l.updateConfiguration();
-                dt = std::min({computing_time_step_size_l.exec(), computing_time_step_size_m.exec(), computing_time_step_size_s.exec()});
                 { // checking if any position has become nan
                     check_nan(particles_l);
                     check_nan(particles_m);
