@@ -7,46 +7,189 @@
 #include "sphinxsys.h"
 using namespace SPH;
 
-Real DH = 0.01;
-Real DL = 0.5;
-Real resolution_ref = DH / 4.0;
+Real DH = 0.0058;
+Real DL1 = 4 * DH;
+Real DL2 = 2 * DH;
+Real DL3 = 2 * DH;
+Real DL = DL1 + DL2 + DL3;
+Real BW = 0.55e-3;
+Real resolution_ref = BW / 4.0;
+Real max_narrowing = 0.3; // 0.3 0.5 0.7
+Real interpolationNum = 200;
+
+//Real DL = 0.4;
+//Real DH = 0.1;
+//Real resolution_ref = DH / 20.0;
 
 Real rho0_s = 1060.0;
-Real Youngs_modulus = 1.0e6;
+Real Youngs_modulus = 0.4e6;
 Real poisson = 0.45;
-Real gravity_g = 100.0;
+Real gravity_g = 1.0e-1;
 
-std::vector<Vecd> createBodyShape()
+//std::vector<Vecd> createBodyShape()
+//{
+//    // geometry
+//    std::vector<Vecd> body_shape;
+//    body_shape.push_back(Vecd(0.0, 0.0));
+//    body_shape.push_back(Vecd(0.0, DH));
+//    body_shape.push_back(Vecd(DL, DH));
+//    body_shape.push_back(Vecd(DL, 0.0));
+//    body_shape.push_back(Vecd(0.0, 0.0));
+//    return body_shape;
+//}
+//
+//std::vector<Vecd> createBodyShape1()
+//{
+//    // geometry
+//    std::vector<Vecd> body_shape1;
+//    body_shape1.push_back(Vecd(0.0, 2.0 * DH));
+//    body_shape1.push_back(Vecd(0.0, 3.0 * DH));
+//    body_shape1.push_back(Vecd(DL, 3.0 * DH));
+//    body_shape1.push_back(Vecd(DL, 2.0 * DH));
+//    body_shape1.push_back(Vecd(0.0, 2.0 * DH));
+//    return body_shape1;
+//}
+//
+//class TestBody : public ComplexShape
+//{
+//  public:
+//    explicit TestBody(const std::string &shape_name) : ComplexShape(shape_name)
+//    {
+//        MultiPolygon test_body(createBodyShape());
+//        MultiPolygon test_body_1(createBodyShape1());
+//        add<MultiPolygonShape>(test_body, "TestBody");
+//        add<MultiPolygonShape>(test_body_1, "TestBody1");
+//    }
+//};
+
+Real outline(Real x_rel, Real a, Real X0)
 {
-    // geometry
-    std::vector<Vecd> body_shape;
-    body_shape.push_back(Vecd(0.0, 0.0));
-    body_shape.push_back(Vecd(0.0, DH));
-    body_shape.push_back(Vecd(DL, DH));
-    body_shape.push_back(Vecd(DL, 0.0));
-    body_shape.push_back(Vecd(0.0, 0.0));
-    return body_shape;
+    if (std::abs(x_rel) <= X0)
+    {
+        return 1.0 - 0.5 * a * (1.0 + std::cos(Pi * x_rel / X0));
+    }
+    else
+    {
+        return 1.0;
+    }
+}
+std::vector<Vecd> createStenosisUpper(Real a,
+                                      Real X0,
+                                      Real D, // diam of normal section
+                                      int N)  // numbers of iteration
+{
+    Real dx = (2.0 * X0) / N; // From -X0 to +X0 split into N sections
+    std::vector<Vecd> stenosis_upper;
+    stenosis_upper.reserve(N + 1);
+
+    for (int i = 0; i <= N; ++i)
+    {
+        Real x_rel = -X0 + i * dx;
+        Real y_rel = outline(x_rel, a, X0);
+        Real y = (D * 0.5) * y_rel;
+        stenosis_upper.push_back(Vecd(x_rel, +y));
+    }
+    stenosis_upper.push_back(stenosis_upper.front());
+    return stenosis_upper;
 }
 
+std::vector<Vecd> createStenosisLower(Real a,
+                                      Real X0,
+                                      Real D, // diam of normal section
+                                      int N)  // numbers of iteration
+{
+    Real dx = (2.0 * X0) / N;
+    std::vector<Vecd> stenosis_lower;
+    stenosis_lower.reserve(N + 1);
+    for (int i = 0; i <= N; ++i)
+    {
+        Real x_rel = -X0 + i * dx;
+        Real y_rel = outline(x_rel, a, X0);
+        Real y = -(D * 0.5) * y_rel;
+        stenosis_lower.push_back(Vecd(x_rel, y));
+    }
+    stenosis_lower.push_back(stenosis_lower.front());
+    return stenosis_lower;
+}
+std::vector<Vecd> createOuterWallShape()
+{
+    std::vector<Vecd> outer_wall_shape;
+    outer_wall_shape.push_back(Vecd(-DL1 - 0.5 * DL2, -0.5 * DH - BW));
+    outer_wall_shape.push_back(Vecd(-DL1 - 0.5 * DL2, 0.5 * DH + BW));
+    outer_wall_shape.push_back(Vecd(0.5 * DL2 + DL3, 0.5 * DH + BW));
+    outer_wall_shape.push_back(Vecd(0.5 * DL2 + DL3, -0.5 * DH - BW));
+    outer_wall_shape.push_back(Vecd(-DL1 - 0.5 * DL2, -0.5 * DH - BW));
+    return outer_wall_shape;
+}
+std::vector<Vecd> createInnerWallShape()
+{
+    std::vector<Vecd> inner_wall_shape;
+    inner_wall_shape.push_back(Vecd(-DL1 - 0.5 * DL2, -0.5 * DH));
+    inner_wall_shape.push_back(Vecd(-DL1 - 0.5 * DL2, 0.5 * DH));
+    inner_wall_shape.push_back(Vecd(0.5 * DL2 + DL3, 0.5 * DH));
+    inner_wall_shape.push_back(Vecd(0.5 * DL2 + DL3, -0.5 * DH));
+    inner_wall_shape.push_back(Vecd(-DL1 - 0.5 * DL2, -0.5 * DH));
+    return inner_wall_shape;
+}
 class TestBody : public ComplexShape
 {
   public:
     explicit TestBody(const std::string &shape_name) : ComplexShape(shape_name)
     {
-        MultiPolygon test_body(createBodyShape());
-        add<MultiPolygonShape>(test_body, "TestBody");
+        MultiPolygon boundary_outer_wall_shape(createOuterWallShape());
+        add<MultiPolygonShape>(boundary_outer_wall_shape, "OuterWallBoundary");
+        MultiPolygon boundary_inner_wall_shape(createInnerWallShape());
+        subtract<MultiPolygonShape>(boundary_inner_wall_shape, "OuterWallBoundary");
+
+        MultiPolygon stenosisUpper(createStenosisUpper(max_narrowing, 0.5 * DL2, DH, interpolationNum));
+        add<MultiPolygonShape>(stenosisUpper);
+        MultiPolygon stenosisLower(createStenosisLower(max_narrowing, 0.5 * DL2, DH, interpolationNum));
+        add<MultiPolygonShape>(stenosisLower);
     }
 };
 
 // the width of constraint: 4 * resolution
+//std::vector<Vecd> createLeftConstraint()
+//{
+//    std::vector<Vecd> left_constraint_shape;
+//    left_constraint_shape.push_back(Vecd(0.0, 0.0));
+//    left_constraint_shape.push_back(Vecd(0.0, 3.0 * DH));
+//    left_constraint_shape.push_back(Vecd(resolution_ref * 4.0, 3.0 * DH));
+//    left_constraint_shape.push_back(Vecd(resolution_ref * 4.0, 0.0));
+//    left_constraint_shape.push_back(Vecd(0.0, 0.0));
+//
+//    return left_constraint_shape;
+//}
+//
+//std::vector<Vecd> createRightConstraint()
+//{
+//    std::vector<Vecd> right_constraint_shape;
+//    right_constraint_shape.push_back(Vecd(DL - resolution_ref * 4.0, 0.0));
+//    right_constraint_shape.push_back(Vecd(DL - resolution_ref * 4.0, 3.0 * DH));
+//    right_constraint_shape.push_back(Vecd(DL, 3.0 * DH));
+//    right_constraint_shape.push_back(Vecd(DL, 0.0));
+//    right_constraint_shape.push_back(Vecd(DL - resolution_ref * 4.0, 0.0));
+//
+//    return right_constraint_shape;
+//}
+//
+//MultiPolygon conbimedConstraint()
+//{
+//    MultiPolygon multi_polygon;
+//    multi_polygon.addAPolygon(createLeftConstraint(), ShapeBooleanOps::add);
+//    multi_polygon.addAPolygon(createRightConstraint(), ShapeBooleanOps::add);
+//
+//    return multi_polygon;
+//}
+
 std::vector<Vecd> createLeftConstraint()
 {
     std::vector<Vecd> left_constraint_shape;
-    left_constraint_shape.push_back(Vecd(0.0, 0.0));
-    left_constraint_shape.push_back(Vecd(0.0, DH));
-    left_constraint_shape.push_back(Vecd(resolution_ref * 4.0, DH));
-    left_constraint_shape.push_back(Vecd(resolution_ref * 4.0, 0.0));
-    left_constraint_shape.push_back(Vecd(0.0, 0.0));
+    left_constraint_shape.push_back(Vecd(-DL1 - 0.5 * DL2, -0.5 * DH - BW));
+    left_constraint_shape.push_back(Vecd(-DL1 - 0.5 * DL2, 0.5 * DH + BW));
+    left_constraint_shape.push_back(Vecd(-DL1 - 0.5 * DL2 + BW, 0.5 * DH + BW));
+    left_constraint_shape.push_back(Vecd(-DL1 - 0.5 * DL2 + BW, -0.5 * DH - BW));
+    left_constraint_shape.push_back(Vecd(-DL1 - 0.5 * DL2, -0.5 * DH - BW));
 
     return left_constraint_shape;
 }
@@ -54,11 +197,11 @@ std::vector<Vecd> createLeftConstraint()
 std::vector<Vecd> createRightConstraint()
 {
     std::vector<Vecd> right_constraint_shape;
-    right_constraint_shape.push_back(Vecd(DL - resolution_ref * 4.0, 0.0));
-    right_constraint_shape.push_back(Vecd(DL - resolution_ref * 4.0, DH));
-    right_constraint_shape.push_back(Vecd(DL, DH));
-    right_constraint_shape.push_back(Vecd(DL, 0.0));
-    right_constraint_shape.push_back(Vecd(DL - resolution_ref * 4.0, 0.0));
+    right_constraint_shape.push_back(Vecd(0.5 * DL2 + DL3 - BW, -0.5 * DH - BW));
+    right_constraint_shape.push_back(Vecd(0.5 * DL2 + DL3 - BW, 0.5 * DH + BW));
+    right_constraint_shape.push_back(Vecd(0.5 * DL2 + DL3, 0.5 * DH + BW));
+    right_constraint_shape.push_back(Vecd(0.5 * DL2 + DL3, -0.5 * DH - BW));
+    right_constraint_shape.push_back(Vecd(0.5 * DL2 + DL3 - BW, -0.5 * DH - BW));
 
     return right_constraint_shape;
 }
@@ -97,6 +240,44 @@ class LinearElasticSolidWithPrestretch : public LinearElasticSolid
 
   private:
     Matd F_pre_;
+};
+//----------------------------------------------------------------------
+//	Solid material definition.
+//----------------------------------------------------------------------
+ class WallBoundaryComposite : public CompositeSolid
+{
+  public:
+    WallBoundaryComposite() : CompositeSolid(rho0_s)
+    {
+        add<LinearElasticSolid>(rho0_s, 0.4e6, poisson); // id = 0
+        //add<LinearElasticSolid>(rho0_s, 0.4e6, poisson); // id = 1
+    };
+};
+
+ class WallMaterialInitialization : public MaterialIdInitialization
+{
+  public:
+    explicit WallMaterialInitialization(SolidBody &solid_body)
+        : MaterialIdInitialization(solid_body) {};
+    void update(size_t index_i, Real dt = 0.0)
+    {
+        //Real x = pos_[index_i][0];
+        //Real y = pos_[index_i][1];
+
+        //if ((std::abs(x) <= (0.5 * DL2)) && (y > (outline(x, max_narrowing, 0.5 * DL2) * (DH * 0.5))) && (y < (0.5 * DH)))
+        //{
+        //    material_id_[index_i] = 1;
+        //}
+        //else if ((std::abs(x) <= (0.5 * DL2)) && (y < (-outline(x, max_narrowing, 0.5 * DL2) * (DH * 0.5))) && (y > (-0.5 * DH)))
+        //{
+        //    material_id_[index_i] = 1;
+        //}
+        //else
+        //{
+        //    material_id_[index_i] = 0;
+        //}
+        material_id_[index_i] = 0;
+    };
 };
 
 // class PrestressedSolid : public SaintVenantKirchhoffSolid
@@ -182,17 +363,19 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     //	Build up the environment of a SPHSystem
     //----------------------------------------------------------------------
-    BoundingBox system_domain_bounds(Vec2d(-DL, -DH), Vec2d(DL * 2.0, DH)); // Expand the domain to prepare for stretching
+    BoundingBox system_domain_bounds(Vec2d(-DL, -DH), Vec2d(DL * 2.0, 4.0 * DH)); // Expand the domain to prepare for stretching
+
+    //BoundingBox system_domain_bounds(Vec2d(-DL1 - 0.5 * DL2 - BW, -0.5 * DH - BW), Vec2d(0.5 * DL2 + DL3, 0.5 * DH + BW));
     SPHSystem sph_system(system_domain_bounds, resolution_ref);
     sph_system.handleCommandlineOptions(ac, av);
 
     //----------------------------------------------------------------------
     //	Creating body, materials and particles.
     //----------------------------------------------------------------------
-    SolidBody test_body(sph_system, makeShared<TestBody>("WallBoundary"));
-    test_body.defineMaterial<LinearElasticSolidWithPrestretch>(rho0_s, Youngs_modulus, poisson);
+    SolidBody test_body(sph_system, makeShared<TestBody>("TestBody"));
+    //test_body.defineMaterial<LinearElasticSolidWithPrestretch>(rho0_s, Youngs_modulus, poisson);
+    test_body.defineMaterial<WallBoundaryComposite>();
     test_body.generateParticles<BaseParticles, Lattice>();
-
     //----------------------------------------------------------------------
     //	Define body relation map.
     //	The contact map gives the topological connections between the bodies.
@@ -206,9 +389,11 @@ int main(int ac, char *av[])
     Gravity gravity(Vecd(0.0, -gravity_g));
     SimpleDynamics<GravityForce<Gravity>> constant_gravity(test_body, gravity); // Apply gravitational force to solids
 
+    SimpleDynamics<WallMaterialInitialization> composite_material_id(test_body);
+
     InteractionWithUpdate<LinearGradientCorrectionMatrixInner> test_body_inner_corrected_configuration(test_body_inner);
 
-    Dynamics1Level<solid_dynamics::Integration1stHalfPK2> stress_relaxation_first_half(test_body_inner);
+    Dynamics1Level<solid_dynamics::DecomposedIntegration1stHalf> stress_relaxation_first_half(test_body_inner);
     Dynamics1Level<solid_dynamics::Integration2ndHalf> stress_relaxation_second_half(test_body_inner);
 
     /** Constrain the Boundary. */
@@ -223,6 +408,7 @@ int main(int ac, char *av[])
     SimpleDynamics<VonMisesStress> wall_stress(test_body);
     write_real_body_states.addToWrite<Real>(test_body, "VonMisesStress");
     write_real_body_states.addToWrite<Matd>(test_body, "DeformationGradient");
+    write_real_body_states.addToWrite<int>(test_body, "MaterialID");
     //----------------------------------------------------------------------
     //	Setup computing and initial conditions.
     //----------------------------------------------------------------------
@@ -230,6 +416,7 @@ int main(int ac, char *av[])
     sph_system.initializeSystemConfigurations();
     test_body_inner_corrected_configuration.exec();
     constant_gravity.exec();
+    composite_material_id.exec();
 
     Real &physical_time = *sph_system.getSystemVariableDataByName<Real>("PhysicalTime");
     int ite = 0;
