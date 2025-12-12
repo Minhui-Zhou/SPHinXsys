@@ -102,31 +102,6 @@ void BaseCellLinkedList::particle_for_split_by_mesh(
     }
 }
 //=================================================================================================//
-template <typename DataType>
-DataType *BaseCellLinkedList::initializeVariable(DiscreteVariable<DataType> *variable, DataType initial_value)
-{
-    DataType *data_field = variable->Data();
-    for (size_t i = 0; i != variable->getDataSize(); ++i)
-    {
-        data_field[i] = initial_value;
-    }
-    return data_field;
-}
-//=================================================================================================//
-template <typename DataType, typename... Args>
-DiscreteVariable<DataType> *BaseCellLinkedList::registerDiscreteVariable(
-    const std::string &name, size_t data_size, Args &&...args)
-{
-    DiscreteVariable<DataType> *variable = findVariableByName<DataType>(all_discrete_variables_, name);
-    if (variable == nullptr)
-    {
-        variable = addVariableToAssemble<DataType>(all_discrete_variables_, all_discrete_variable_ptrs_,
-                                                   name, data_size);
-        initializeVariable(variable, std::forward<Args>(args)...);
-    }
-    return variable;
-}
-//=================================================================================================//
 template <class ExecutionPolicy, class LocalDynamicsFunction>
 void BaseCellLinkedList::particle_for_split(const ExecutionPolicy &ex_policy,
                                             const LocalDynamicsFunction &local_dynamics_function)
@@ -142,13 +117,13 @@ NeighborSearch::NeighborSearch(const ExecutionPolicy &ex_policy, CellLinkedList 
       cell_offset_(cell_linked_list.dvCellOffset()->DelegatedData(ex_policy)) {}
 //=================================================================================================//
 template <typename FunctionOnEach>
-void NeighborSearch::forEachSearch(UnsignedInt source_index, const Vecd *source_pos,
-                                   const FunctionOnEach &function, int depth) const
+void NeighborSearch::forEachSearch(const Vecd &source_pos, const FunctionOnEach &function,
+                                   const BoundingBoxi &search_box) const
 {
-    const Arrayi target_cell_index = CellIndexFromPosition(source_pos[source_index]);
+    const BoundingBoxi search_range =
+        search_box.translate(CellIndexFromPosition(source_pos));
     mesh_for_each(
-        Arrayi::Zero().max(target_cell_index - depth * Arrayi::Ones()),
-        all_cells_.min(target_cell_index + (depth + 1) * Arrayi::Ones()),
+        Arrayi::Zero().max(search_range.lower_), all_cells_.min(search_range.upper_ + Arrayi::Ones()),
         [&](const Arrayi &cell_index)
         {
             const UnsignedInt linear_index = LinearCellIndex(cell_index);

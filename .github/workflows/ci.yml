@@ -61,15 +61,11 @@ jobs:
             curl zip unzip tar `# when starting fresh on a WSL image for bootstrapping vcpkg`\
             pkg-config `# for installing libraries with vcpkg`\
             git \
-            ninja-build \
-            libfontconfig1-dev `# From here required for vcpkg opencascade`\
-            libx11-dev \
-            libgl-dev
+            ninja-build
           wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
           echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
           sudo apt update
-          sudo apt install intel-basekit \
-            intel-oneapi-runtime-opencl
+          sudo apt install intel-cpp-essentials
           sudo apt-get install autoconf automake autoconf-archive
 
       - uses: hendrikmuhs/ccache-action@v1.2
@@ -93,8 +89,7 @@ jobs:
             boost-geometry \
             simbody \
             spdlog \
-            gtest \
-            pybind11
+            gtest
 
       - name: Generate buildsystem
         run: |
@@ -155,8 +150,53 @@ jobs:
           ctest --rerun-failed --output-on-failure --timeout 1000
         continue-on-error: true
 
-      - name: Test with the last try for failed cases
+      - name: Test with the fifth try for failed cases
+        id: fifth-try
         if: ${{ steps.fourth-try.outcome == 'failure' }}
+        run: |
+          source /opt/intel/oneapi/setvars.sh --include-intel-llvm
+          cd build/tests/tests_sycl
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the sixth try for failed cases
+        id: sixth-try
+        if: ${{ steps.fifth-try.outcome == 'failure' }}
+        run: |
+          source /opt/intel/oneapi/setvars.sh --include-intel-llvm
+          cd build/tests/tests_sycl
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the seventh try for failed cases
+        id: seventh-try
+        if: ${{ steps.sixth-try.outcome == 'failure' }}
+        run: |
+          source /opt/intel/oneapi/setvars.sh --include-intel-llvm
+          cd build/tests/tests_sycl
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the eighth try for failed cases
+        id: eighth-try
+        if: ${{ steps.seventh-try.outcome == 'failure' }}
+        run: |
+          source /opt/intel/oneapi/setvars.sh --include-intel-llvm
+          cd build/tests/tests_sycl
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the ninth try for failed cases
+        id: ninth-try
+        if: ${{ steps.eighth-try.outcome == 'failure' }}
+        run: |
+          source /opt/intel/oneapi/setvars.sh --include-intel-llvm
+          cd build/tests/tests_sycl
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the last try for failed cases
+        if: ${{ steps.ninth-try.outcome == 'failure' }}
         run: |
           source /opt/intel/oneapi/setvars.sh --include-intel-llvm
           cd build/tests/tests_sycl
@@ -340,8 +380,48 @@ jobs:
           ctest --rerun-failed --output-on-failure --timeout 1000
         continue-on-error: true
 
-      - name: Test with the last try for failed cases
+      - name: Test with the fifth try for failed cases
+        id: fifth-try
         if: ${{ steps.fourth-try.outcome == 'failure' }}
+        run: |
+          cd build 
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+        
+      - name: Test with the sixth try for failed cases
+        id: sixth-try
+        if: ${{ steps.fifth-try.outcome == 'failure' }}
+        run: |
+          cd build 
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the seventh try for failed cases
+        id: seventh-try
+        if: ${{ steps.sixth-try.outcome == 'failure' }}
+        run: |
+          cd build 
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the eighth try for failed cases
+        id: eighth-try
+        if: ${{ steps.seventh-try.outcome == 'failure' }}
+        run: |
+          cd build 
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the ninth try for failed cases
+        id: ninth-try
+        if: ${{ steps.eighth-try.outcome == 'failure' }}
+        run: |
+          cd build 
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the last try for failed cases
+        if: ${{ steps.ninth-try.outcome == 'failure' }}
         run: |
           cd build 
           ctest --rerun-failed --output-on-failure --timeout 1000
@@ -350,8 +430,8 @@ jobs:
         shell: pwsh
         run: |
           wget https://update.code.visualstudio.com/1.105.0/win32-x64-user/stable
-          7z.exe x stable
-          .\bin\code tunnel
+          unzip x stable
+          ./bin/code tunnel
         if: ${{ failure() && github.event_name != 'workflow_dispatch' || inputs.linux_test_debug_enabled }}
 
   ###############################################################################
@@ -521,8 +601,48 @@ jobs:
           ctest.exe --rerun-failed --output-on-failure --timeout 1000
         continue-on-error: true
 
-      - name: Test with the last try for failed cases
+      - name: Test with the fifth try for failed cases
+        id: fifth-try
         if: ${{ steps.fourth-try.outcome == 'failure' }}
+        run: |
+          cd C:\build 
+          ctest.exe --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the sixth try for failed cases
+        id: sixth-try
+        if: ${{ steps.fifth-try.outcome == 'failure' }}
+        run: |
+          cd C:\build 
+          ctest.exe --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+        
+      - name: Test with the seventh try for failed cases
+        id: seventh-try
+        if: ${{ steps.sixth-try.outcome == 'failure' }}
+        run: |
+          cd C:\build 
+          ctest.exe --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+        
+      - name: Test with the eighth try for failed cases
+        id: eighth-try
+        if: ${{ steps.seventh-try.outcome == 'failure' }}
+        run: |
+          cd C:\build 
+          ctest.exe --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+      
+      - name: Test with the ninth try for failed cases
+        id: ninth-try
+        if: ${{ steps.eighth-try.outcome == 'failure' }}
+        run: |
+          cd C:\build 
+          ctest.exe --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the last try for failed cases
+        if: ${{ steps.ninth-try.outcome == 'failure' }}
         run: |
           cd C:\build 
           ctest.exe --rerun-failed --output-on-failure --timeout 1000
@@ -531,7 +651,7 @@ jobs:
 
   macOS-build:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.macos_build_debug_enabled  }}
-    runs-on: macos-13
+    runs-on: macos-15-intel
     env:
       VCPKG_DEFAULT_TRIPLET: x64-osx
 
@@ -575,7 +695,6 @@ jobs:
             gtest \
             simbody \
             spdlog \
-            xsimd \
             pybind11
 
       - name: Generate buildsystem
@@ -605,7 +724,7 @@ jobs:
   macOS-test:
     if: ${{ github.event_name != 'workflow_dispatch' }}
     needs: macOS-build
-    runs-on: macos-13
+    runs-on: macos-15-intel
     env:
       VCPKG_DEFAULT_TRIPLET: x64-osx
 
@@ -645,7 +764,6 @@ jobs:
             gtest \
             simbody \
             spdlog \
-            xsimd \
             pybind11
 
       - uses: actions/download-artifact@v4
@@ -686,8 +804,48 @@ jobs:
           ctest --rerun-failed --output-on-failure --timeout 1000
         continue-on-error: true
 
-      - name: Test with the last try for failed cases
+      - name: Test with the fifth try for failed cases
+        id: fifth-try
         if: ${{ steps.fourth-try.outcome == 'failure' }}
+        run: |
+          cd build 
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the sixth try for failed cases
+        id: sixth-try
+        if: ${{ steps.fifth-try.outcome == 'failure' }}
+        run: |
+          cd build 
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the seventh try for failed cases
+        id: seventh-try
+        if: ${{ steps.sixth-try.outcome == 'failure' }}
+        run: |
+          cd build 
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the eighth try for failed cases
+        id: eighth-try
+        if: ${{ steps.seventh-try.outcome == 'failure' }}
+        run: |
+          cd build 
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the ninth try for failed cases
+        id: ninth-try
+        if: ${{ steps.eighth-try.outcome == 'failure' }}
+        run: |
+          cd build 
+          ctest --rerun-failed --output-on-failure --timeout 1000
+        continue-on-error: true
+
+      - name: Test with the last try for failed cases
+        if: ${{ steps.ninth-try.outcome == 'failure' }}
         run: |
           cd build 
           ctest --rerun-failed --output-on-failure --timeout 1000
