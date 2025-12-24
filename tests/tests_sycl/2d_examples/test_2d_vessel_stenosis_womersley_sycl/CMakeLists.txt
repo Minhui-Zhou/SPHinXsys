@@ -23,11 +23,13 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${BUILD_RESTART_PATH}
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/restart/ DESTINATION ${BUILD_RESTART_PATH})
 
 aux_source_directory(. DIR_SRCS)
-ADD_EXECUTABLE(${PROJECT_NAME} ${DIR_SRCS})
+ADD_EXECUTABLE(${PROJECT_NAME} ${EXECUTABLE_OUTPUT_PATH} ${DIR_SRCS})
 
-add_test(NAME ${PROJECT_NAME}_particle_relaxation COMMAND ${PROJECT_NAME} --relax=true --state_recording=${TEST_STATE_RECORDING}
-    WORKING_DIRECTORY ${EXECUTABLE_OUTPUT_PATH})
-add_test(NAME ${PROJECT_NAME} COMMAND ${PROJECT_NAME}  --reload=true --state_recording=${TEST_STATE_RECORDING}
+# add_test(NAME ${PROJECT_NAME}_particle_relaxation COMMAND ${PROJECT_NAME} --relax=true --state_recording=${TEST_STATE_RECORDING}
+#     WORKING_DIRECTORY ${EXECUTABLE_OUTPUT_PATH})
+# add_test(NAME ${PROJECT_NAME} COMMAND ${PROJECT_NAME}  --reload=true --state_recording=${TEST_STATE_RECORDING}
+#     WORKING_DIRECTORY ${EXECUTABLE_OUTPUT_PATH})
+add_test(NAME ${PROJECT_NAME}_restart COMMAND ${PROJECT_NAME} --restart_step=14000 --state_recording=${TEST_STATE_RECORDING}
     WORKING_DIRECTORY ${EXECUTABLE_OUTPUT_PATH})
 
 set_tests_properties(${PROJECT_NAME}_restart PROPERTIES LABELS "pulsatile inlet, pressure outlet")

@@ -7,15 +7,14 @@
 
 #include "sphinxsys.h" 
 using namespace SPH;
-// 0.3
+//----------------------------------------------------------------------
+// Select stenosis case (30% / 50% / 70%)
+// By default we use the 30% stenosis CSVs.
+// If you want 50% or 70% stenosis, change the filename suffix from "_0.3"
+// to "_0.5" or "_0.7" accordingly (0.3=30%, 0.5=50%, 0.7=70%).
+//----------------------------------------------------------------------
 std::string womersley_velocity_profile_csv = "./input/womersley_velocity_profile_0.3.csv";
 std::string outlet_pressure_csv = "./input/outlet_pressure_0.3.csv";
-// 0.5
-//std::string womersley_velocity_profile_csv = "./input/womersley_velocity_profile_0.5.csv";
-//std::string outlet_pressure_csv = "./input/outlet_pressure_0.5.csv";
-// 0.7
-//std::string womersley_velocity_profile_csv = "./input/womersley_velocity_profile_0.7.csv";
-//std::string outlet_pressure_csv = "./input/outlet_pressure_0.7.csv";
 //----------------------------------------------------------------------
 //  Basic geometry parameters and numerical setup.
 //----------------------------------------------------------------------
@@ -32,11 +31,11 @@ BoundingBoxd system_domain_bounds(Vec2d(-DL1 - 0.5 * DL2 - BW, -0.5 * DH - BW), 
 //----------------------------------------------------------------------
 //	Observation points
 //----------------------------------------------------------------------
-StdVec<Vecd> createAxialObservationPoints(Real full_length = DL, Vecd translation = Vecd(-DL1 - 0.5 * DL2, 0.0)) // 中心均匀取点n_pts个
+StdVec<Vecd> createAxialObservationPoints(Real full_length = DL, Vecd translation = Vecd(-DL1 - 0.5 * DL2, 0.0)) 
 {
     StdVec<Vecd> observation_points;
     const int n_pts = 101;
-    for (int i = 1; i < n_pts - 1; ++i) // except first and last point
+    for (int i = 0; i < n_pts; ++i) 
     {
         Real x = full_length * i / (n_pts - 1);
         Vecd point_coordinate(x, 0.0);
