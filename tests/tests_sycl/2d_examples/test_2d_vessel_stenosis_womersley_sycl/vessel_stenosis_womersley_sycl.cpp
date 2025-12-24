@@ -35,7 +35,7 @@ StdVec<Vecd> createAxialObservationPoints(Real full_length = DL, Vecd translatio
 {
     StdVec<Vecd> observation_points;
     const int n_pts = 101;
-    for (int i = 0; i < n_pts; ++i) 
+    for (int i = 1; i < n_pts - 1; ++i) 
     {
         Real x = full_length * i / (n_pts - 1);
         Vecd point_coordinate(x, 0.0);
@@ -63,9 +63,9 @@ Vec2d normal = Vec2d(1.0, 0.0);
 class WomersleyProfileCSV
 {
   public:
-    std::vector<Real> times;                   // Nt
-    std::vector<Real> radii;                   // Nr
-    std::vector<std::vector<Real>> velocities; // Nt x Nr
+    std::vector<Real> times;               
+    std::vector<Real> radii;                  
+    std::vector<std::vector<Real>> velocities; 
     Real period{0.0};
 
     explicit WomersleyProfileCSV(const std::string &csv_file, Real period_override = -1.0)
@@ -90,7 +90,7 @@ class WomersleyProfileCSV
             if (line.empty())
                 continue;
             std::stringstream ls(line);
-            std::getline(ls, token, ','); // time
+            std::getline(ls, token, ','); 
             if (token == "NaN" || token.empty())
                 continue;
             times.push_back(static_cast<Real>(std::stod(token)));
@@ -128,7 +128,6 @@ class WomersleyProfileCSV
 
     Real value(Real r, Real t) const
     {
-        // clamp r
         if (r <= radii.front())
             r = radii.front();
         else if (r >= radii.back())
@@ -250,7 +249,6 @@ class OutletPressureCSV
         if (times.empty())
             return Real(0);
 
-        // wrap t into one period [t0, t0+T)
         if (period > Real(0))
         {
             Real t0 = times.front();
@@ -279,13 +277,14 @@ public:
 
     Real getPressure(const Real& /*input_pressure*/, Real time)
     {
-        return 1000.0 * pressure_profile.value(time); // convert from kPa to Pa
+        return 1000.0 * pressure_profile.value(time); 
     }
 };
 //----------------------------------------------------------------------
 //	stenosis definition
+//  a - maximaum narrowing, X0 - halflength of stenosis
 //----------------------------------------------------------------------
-// @param a: maximaum narrowing, X0 - halflength of stenosis
+
 Real outline(Real x_rel, Real a, Real X0)
 {
     if (std::abs(x_rel) <= X0)
@@ -303,7 +302,7 @@ std::vector<Vecd> createStenosisUpper(Real a,
                                       Real D, // diam of normal section
                                       int N)  // numbers of iteration
 {
-    Real dx = (2.0 * X0) / N; // From -X0 to +X0 split into N sections
+    Real dx = (2.0 * X0) / N; 
     std::vector<Vecd> stenosis_upper;
     stenosis_upper.reserve(N + 1);
 
@@ -384,11 +383,11 @@ std::vector<Vecd> createCompleteInnerWallShape(Real a,
                                       int N)  // numbers of iteration
 {
     std::vector<Vecd> lumen;
-    //1. left up
+
     lumen.push_back(Vecd(-DL1 - 0.5 * DL2, -0.5 * D));
     lumen.push_back(Vecd(-DL1 - 0.5 * DL2, 0.5 * D));
     lumen.push_back(Vecd(-X0, 0.5 * D));
-    //2. upper stenosis
+
     Real dx = (2.0 * X0) / N;
     std::vector<Vecd> stenosis_lower1;
     stenosis_lower1.reserve(N + 1);
@@ -399,12 +398,12 @@ std::vector<Vecd> createCompleteInnerWallShape(Real a,
         Real y = (D * 0.5) * y_rel;
         lumen.push_back(Vecd(x_rel, +y));
     }
-    //3. right up
+
     lumen.push_back(Vecd(0.5 * DL2 + DL3, 0.5 * D));
-    //4. right down
+
     lumen.push_back(Vecd(0.5 * DL2 + DL3, -0.5 * D));
     lumen.push_back(Vecd(X0, -0.5 * D));
-    //5. lower stenosis
+
     for (int i = N; i >= 0; --i)
     {
         Real x_rel = -X0 + i * dx;
@@ -412,7 +411,7 @@ std::vector<Vecd> createCompleteInnerWallShape(Real a,
         Real y = -(D * 0.5) * y_rel;
         lumen.push_back(Vecd(x_rel, y));
     }
-    //6. left down
+
     lumen.push_back(lumen.front());
     return lumen;
 }
@@ -443,8 +442,6 @@ int main(int ac, char *av[])
 
     // sph_system.setRunParticleRelaxation(false);
     // sph_system.setReloadParticles(true);
-    // sph_system.setGenerateRegressionData(false);
-
     sph_system.setRestartStep(14000); 
 
     sph_system.handleCommandlineOptions(ac, av);
@@ -794,7 +791,7 @@ int main(int ac, char *av[])
     {
         write_centerline_velocity.generateDataBase(0.05);
     }
-    else /*if (sph_system.RestartStep() == 0)*/
+    else
     {
         write_centerline_velocity.testResult();
     }
