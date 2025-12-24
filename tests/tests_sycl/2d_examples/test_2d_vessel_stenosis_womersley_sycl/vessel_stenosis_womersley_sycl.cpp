@@ -442,7 +442,7 @@ int main(int ac, char *av[])
 
     // sph_system.setRunParticleRelaxation(false);
     // sph_system.setReloadParticles(true);
-    sph_system.setRestartStep(14000); 
+    // sph_system.setRestartStep(14000); 
 
     sph_system.handleCommandlineOptions(ac, av);
     //----------------------------------------------------------------------
