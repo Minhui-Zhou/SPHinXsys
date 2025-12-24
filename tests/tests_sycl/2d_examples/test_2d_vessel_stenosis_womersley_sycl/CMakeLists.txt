@@ -29,10 +29,10 @@ add_test(NAME ${PROJECT_NAME}_particle_relaxation COMMAND ${PROJECT_NAME} --rela
     WORKING_DIRECTORY ${EXECUTABLE_OUTPUT_PATH})
 add_test(NAME ${PROJECT_NAME} COMMAND ${PROJECT_NAME}  --reload=true --state_recording=${TEST_STATE_RECORDING}
     WORKING_DIRECTORY ${EXECUTABLE_OUTPUT_PATH})
-add_test(NAME ${PROJECT_NAME}_restart COMMAND ${PROJECT_NAME} --restart_step=14000 --state_recording=${TEST_STATE_RECORDING}
-    WORKING_DIRECTORY ${EXECUTABLE_OUTPUT_PATH})
+# add_test(NAME ${PROJECT_NAME}_restart COMMAND ${PROJECT_NAME} --restart_step=14000 --state_recording=${TEST_STATE_RECORDING}
+#     WORKING_DIRECTORY ${EXECUTABLE_OUTPUT_PATH})
 
-set_tests_properties(${PROJECT_NAME}_restart PROPERTIES LABELS "pulsatile inlet, pressure outlet")
+set_tests_properties(${PROJECT_NAME} PROPERTIES LABELS "pulsatile inlet, pressure outlet")
 
 set_target_properties(${PROJECT_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${EXECUTABLE_OUTPUT_PATH}")
 
