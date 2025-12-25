@@ -432,6 +432,8 @@ class WallBoundary : public ComplexShape
 //----------------------------------------------------------------------
 int main(int ac, char *av[])
 {
+    auto dev = sycl::queue{}.get_device();
+    std::cout << "[SYCL] device: " << dev.get_info<sycl::info::device::name>() << "\n";
     //----------------------------------------------------------------------
     //	Build up an SPHSystem and IO environment.
     //----------------------------------------------------------------------
@@ -572,7 +574,7 @@ int main(int ac, char *av[])
 
     //----------------------------------------------------------------------
     //	Particle reloading.
-    //----------------------------------------------------------------------    
+    //----------------------------------------------------------------------
     blood.generateParticlesWithReserve<BaseParticles, Reload>(particle_buffer, blood.getName());
     wall_boundary.generateParticles<BaseParticles, Reload>(wall_boundary.getName());
     //----------------------------------------------------------------------
