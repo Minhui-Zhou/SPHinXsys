@@ -4,14 +4,6 @@
  * @details This is a test case for Womersley flow in a 2D vessel with stenosis
  * @author 	Minhui Zhou, Dong Wu, Xiangyu Hu
  */
-#if __has_include(<CL/sycl.hpp>)
-  #include <CL/sycl.hpp>
-  namespace sycl_ns = cl::sycl;
-#elif __has_include(<sycl/sycl.hpp>)
-  #include <sycl/sycl.hpp>
-  namespace sycl_ns = sycl;
-#endif
-
 #include "sphinxsys.h" 
 using namespace SPH;
 //----------------------------------------------------------------------
@@ -439,24 +431,12 @@ class WallBoundary : public ComplexShape
 //----------------------------------------------------------------------
 int main(int ac, char *av[])
 {
-    #ifdef SYCL_LANGUAGE_VERSION
-        auto dev = sycl_ns::queue{}.get_device();
-        std::cout << "[SYCL] device: "
-                    << dev.get_info<sycl_ns::info::device::name>() << "\n";
-    #endif
-
     //----------------------------------------------------------------------
     //	Build up an SPHSystem and IO environment.
     //----------------------------------------------------------------------
     SPHSystem sph_system(system_domain_bounds, resolution_ref);
-
     // sph_system.setRunParticleRelaxation(true);
     // sph_system.setReloadParticles(false);
-
-    // sph_system.setRunParticleRelaxation(false);
-    // sph_system.setReloadParticles(true);
-    // sph_system.setRestartStep(14000); 
-
     sph_system.handleCommandlineOptions(ac, av);
     //----------------------------------------------------------------------
     //	Creating bodies with corresponding materials and particles.
