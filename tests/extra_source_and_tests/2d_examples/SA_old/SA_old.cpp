@@ -461,7 +461,7 @@ int main(int ac, char *av[])
     //	Creating bodies with corresponding materials and particles.
     //----------------------------------------------------------------------
     FluidBody blood(sph_system, makeShared<Blood>("WaterBody"));
-    blood.defineBodyLevelSetShape()->correctLevelSetSign()->writeLevelSet(sph_system);
+    blood.defineBodyLevelSetShape()->correctLevelSetSign()->writeLevelSet();
     blood.defineClosure<WeaklyCompressibleFluid, Viscosity>(ConstructArgs(rho0_f, c_f), mu_f);
     ParticleBuffer<ReserveSizeFactor> in_outlet_particle_buffer(6.0);
     (!sph_system.RunParticleRelaxation() && sph_system.ReloadParticles())
@@ -469,7 +469,7 @@ int main(int ac, char *av[])
         : blood.generateParticles<BaseParticles, Lattice>();
 
     SolidBody wall_boundary(sph_system, makeShared<WallBoundary>("WallBoundary"));
-    wall_boundary.defineBodyLevelSetShape()->correctLevelSetSign()->writeLevelSet(sph_system);
+    wall_boundary.defineBodyLevelSetShape()->correctLevelSetSign()->writeLevelSet();
     wall_boundary.defineMaterial<Solid>();
     (!sph_system.RunParticleRelaxation() && sph_system.ReloadParticles())
         ? wall_boundary.generateParticles<BaseParticles, Reload>(wall_boundary.getName())
@@ -479,34 +479,23 @@ int main(int ac, char *av[])
     velocity_axial_observer.defineAdaptationRatios(0.25, 1.0); 
     velocity_axial_observer.generateParticles<ObserverParticles>(createAxialObservationPoints());
     //----------------------------------------------------------------------
-    //	Define body relation map.
-    //	The contact map gives the topological connections between the bodies.
-    //	Basically the the range of bodies to build neighbor particle lists.
-    //  Generally, we first define all the inner relations, then the contact relations.
-    //----------------------------------------------------------------------
-    InnerRelation blood_inner(blood);
-    InnerRelation wall_boundary_inner(wall_boundary);
-    ContactRelation blood_contact(blood, {&wall_boundary});
-    ContactRelation wall_boundary_contact(wall_boundary, {&blood});
-    ContactRelation velocity_observer_contact_axial(velocity_axial_observer, {&blood});
-    //----------------------------------------------------------------------
-    // Combined relations built from basic relations
-    // which is only used for update configuration.
-    //----------------------------------------------------------------------
-    ComplexRelation blood_complex(blood_inner, blood_contact);
-    //----------------------------------------------------------------------
     //	Run particle relaxation for body-fitted distribution if chosen.
     //----------------------------------------------------------------------
     if (sph_system.RunParticleRelaxation())
     {
+        //----------------------------------------------------------------------
+        //	Define body relation map used for particle relaxation.
+        //----------------------------------------------------------------------
+        InnerRelation blood_inner(blood);
+        InnerRelation wall_boundary_inner(wall_boundary);
         //----------------------------------------------------------------------
         //	Methods used for particle relaxation.
         //----------------------------------------------------------------------
         using namespace relax_dynamics;
         SimpleDynamics<RandomizeParticlePosition> random_wall_boundary_particles(wall_boundary);
         SimpleDynamics<RandomizeParticlePosition> random_blood_particles(blood);
-        RelaxationStepLevelSetCorrectionInner relaxation_step_inner(wall_boundary_inner);
-        RelaxationStepLevelSetCorrectionInner relaxation_step_inner_blood(blood_inner);
+        RelaxationStepInner relaxation_step_inner(wall_boundary_inner);
+        RelaxationStepInner relaxation_step_inner_blood(blood_inner);
         BodyStatesRecordingToVtp write_wall_boundary_and_blood(sph_system);
         ReloadParticleIO write_particle_reload_files({&wall_boundary, &blood});
         //----------------------------------------------------------------------
@@ -534,7 +523,22 @@ int main(int ac, char *av[])
         write_particle_reload_files.writeToFile();
         return 0;
     }
-
+    //----------------------------------------------------------------------
+    //	Define body relation map.
+    //	The contact map gives the topological connections between the bodies.
+    //	Basically the the range of bodies to build neighbor particle lists.
+    //  Generally, we first define all the inner relations, then the contact relations.
+    //----------------------------------------------------------------------
+    InnerRelation blood_inner(blood);
+    InnerRelation wall_boundary_inner(wall_boundary);
+    ContactRelation blood_contact(blood, {&wall_boundary});
+    ContactRelation wall_boundary_contact(wall_boundary, {&blood});
+    ContactRelation velocity_observer_contact_axial(velocity_axial_observer, {&blood});
+    //----------------------------------------------------------------------
+    // Combined relations built from basic relations
+    // which is only used for update configuration.
+    //----------------------------------------------------------------------
+    ComplexRelation blood_complex(blood_inner, blood_contact);
     //----------------------------------------------------------------------
     // Define the numerical methods used in the simulation.
     // Note that there may be data dependence on the sequence of constructions.
@@ -556,10 +560,6 @@ int main(int ac, char *av[])
 
     ReduceDynamics<fluid_dynamics::AdvectionViscousTimeStep> get_fluid_advection_time_step_size(blood, U_f);
     ReduceDynamics<fluid_dynamics::AcousticTimeStep> get_fluid_time_step_size(blood);
-    //----------------------------------------------------------------------
-    //	Algorithms of FSI.
-    //----------------------------------------------------------------------
-    InteractionWithUpdate<solid_dynamics::ViscousForceFromFluid> viscous_force_from_fluid(wall_boundary_contact); // to register 'ViscousForceFromFluid'
     //----------------------------------------------------------------------
     //  Buffer
     //----------------------------------------------------------------------
@@ -615,10 +615,8 @@ int main(int ac, char *av[])
         velocity_observer_contact_axial.updateConfiguration();
     }
     //----------------------------------------------------------------------
-    //	Setup for time-stepping control    // sph_system.setRunParticleRelaxation(true);
-    // sph_system.setReloadParticles(false);
+    //	Setup for time-stepping control
     //----------------------------------------------------------------------
-    //Real &physical_time = *sph_system.getSystemVariableDataByName<Real>("PhysicalTime");
     size_t number_of_iterations = sph_system.RestartStep();
     int screen_output_interval = 100;
     int restart_output_interval = screen_output_interval * 10;
@@ -649,9 +647,6 @@ int main(int ac, char *av[])
 
             viscous_acceleration.exec();
             transport_velocity_correction.exec();
-
-            /** FSI for viscous force. */
-            viscous_force_from_fluid.exec();
 
             Real relaxation_time = 0.0;
             while (relaxation_time < Dt)
