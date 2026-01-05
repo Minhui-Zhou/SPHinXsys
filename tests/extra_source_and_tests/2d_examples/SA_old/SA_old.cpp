@@ -589,7 +589,6 @@ int main(int ac, char *av[])
     body_states_recording.addToWrite<int>(blood, "Indicator");
     body_states_recording.addToWrite<Real>(blood, "Density");
     body_states_recording.addToWrite<int>(blood, "BufferIndicator");
-    body_states_recording.addToWrite<Vecd>(wall_boundary, "ViscousForceFromFluid");
     RestartIO restart_io(sph_system);
     RegressionTestDynamicTimeWarping<ObservedQuantityRecording<Vecd>> write_centerline_velocity_axial("Velocity", velocity_observer_contact_axial);
     //----------------------------------------------------------------------
