@@ -22,9 +22,9 @@ Real DL1 = 4 * DH;
 Real DL2 = 2 * DH;
 Real DL3 = 16 * DH;
 Real DL = DL1 + DL2 + DL3;
-Real resolution_ref = DH / 12.0; // ratio = 2, like 12 24 48
+Real resolution_ref = DH / 12.0; 
 Real BW = resolution_ref * 4.0; 
-Real max_narrowing = 0.3; // 0.3 0.5 0.7
+Real max_narrowing = 0.3; // chage to 0.5 or 0.7 for other stenosis cases
 Real interpolationNum = 100;
 BoundingBoxd system_domain_bounds(Vec2d(-DL1 - 0.5 * DL2 - BW, -0.5 * DH - BW), Vec2d(0.5 * DL2 + DL3, 0.5 * DH + BW));
 //----------------------------------------------------------------------
