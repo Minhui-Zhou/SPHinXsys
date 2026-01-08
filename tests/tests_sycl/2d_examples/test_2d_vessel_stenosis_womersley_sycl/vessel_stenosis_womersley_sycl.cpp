@@ -486,7 +486,6 @@ int main(int ac, char *av[])
         //----------------------------------------------------------------------
         SPHSolver sph_solver(sph_system);
         auto &main_methods = sph_solver.addParticleMethodContainer(par_host);
-        auto &host_methods = sph_solver.addParticleMethodContainer(par_host);
         //----------------------------------------------------------------------
         // Define the numerical methods used in the simulation.
         // Note that there may be data dependence on the sequence of constructions.
